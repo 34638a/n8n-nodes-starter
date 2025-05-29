@@ -1,0 +1,251 @@
+import type {
+	IDataObject,
+	IExecuteFunctions,
+	IHttpRequestMethods,
+	IHttpRequestOptions,
+	INodeExecutionData,
+	INodeType,
+	INodeTypeDescription,
+	NodeParameterValueType,
+} from 'n8n-workflow';
+import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
+import { setTimeout as delay } from 'timers/promises';
+import querystring from 'querystring';
+
+export class Bigcommerce_Action implements INodeType {
+	description: INodeTypeDescription = {
+		displayName: 'Call Bigcommerce API',
+		icon: 'file:bigcommerce-logomark-whitebg.svg',
+		name: 'bigcommerceActionNode',
+		group: ['transform'],
+		version: 1,
+		description: 'Interact with the Bigcommerce API',
+		defaults: {
+			name: 'Call Bigcommerce API',
+		},
+		inputs: [NodeConnectionType.Main],
+		outputs: [NodeConnectionType.Main],
+		usableAsTool: true,
+		credentials: [
+			{
+				name: 'bigcommerceApi',
+				required: true,
+			},
+		],
+		properties: [
+			// Node properties which the user gets displayed and
+			// can change on the node.
+			{
+				displayName: 'API Endpoint Path',
+				name: 'apiEndpointPath',
+				type: 'string',
+				default: '',
+				placeholder: '/v3/catalog/products',
+				description:
+					'The API endpoint path to call. This should be the path after the store hash, e.g., `/v3/catalog/products`. Check the BigCommerce API documentation for available endpoints. Leading Slash is required.',
+				required: true,
+				validateType: 'string',
+			},
+			{
+				displayName: 'Request Type',
+				name: 'requestType',
+				type: 'options',
+				options: [
+					{
+						name: 'GET',
+						value: 'get',
+					},
+					{
+						name: 'POST',
+						value: 'post',
+					},
+					{
+						name: 'PUT',
+						value: 'put',
+					},
+					{
+						name: 'DELETE',
+						value: 'delete',
+					},
+				],
+				default: 'get',
+				description:
+					'The HTTP request type to use for the API call. Check the BigCommerce API documentation for the correct request type to use for each endpoint.',
+				required: true,
+			},
+			{
+				displayName: 'Query Parameters',
+				name: 'queryParameters',
+				type: 'json',
+				placeholder: 'Add Query Parameter',
+				default: '{}',
+				description:
+					'Optional query parameters to include in the API request. These will be appended to the URL as query strings.',
+				hint: "If bigcommerce specifies a array/list of items as your input. For example `id:in`, and your data is a JS Array: `[1,2,3]`, you can use the expression `{{ $json.id.join(',') }}` to convert it to a comma-separated string. This is necessary because Bigcommerce does not support array inputs in query parameters.",
+			},
+			{
+				displayName: 'Body JSON',
+				name: 'bodyParameters',
+				type: 'json',
+				default: '{}',
+				placeholder: '{"key": "value"}',
+				description:
+					'Optional body parameters to include in the API request. This is typically used for POST and PUT requests where you need to send data to the server.',
+				hint: 'This should be a valid JSON object. If you need to send an array, as the body, be sure to wrap the entire input `[{"text": "value1"}, {"text": "value2"}` in square brackets. BigCommerce API expects the body to be an array for certain endpoints.`',
+			},
+			{
+				displayName: 'Special Options',
+				name: 'specialOptions',
+				type: 'collection',
+				placeholder: 'Add Option',
+				default: {},
+				options: [
+					{
+						displayName: 'Respect 429 Backoff and Retry Later',
+						name: 'backoff429',
+						type: 'boolean',
+						default: true,
+						// eslint-disable-next-line n8n-nodes-base/node-param-description-boolean-without-whether
+						description: 'When the API returns a 429 Too Many Requests error, this node will automatically back off and retry the request after a delay',
+					}, /*
+					{
+						displayName: "Send As Form Data",
+						name: "sendAsFormData",
+						type: "boolean",
+						default: false,
+						description: 'When enabled, the body parameters will be sent as form data instead of JSON. This is useful for endpoints that expect form-encoded data, mostly File upload api calls.'
+					},//*/
+					{
+						displayName: 'Get All Pages',
+						name: 'autoPaginate',
+						type: 'boolean',
+						default: false,
+						// eslint-disable-next-line n8n-nodes-base/node-param-description-boolean-without-whether
+						description: 'Automatically handle pagination and retrieve all pages of results. This will make multiple API calls until all pages are retrieved. If disabled, only the first page of results will be returned.',
+						hint: 'This will only work for endpoints that support pagination and return a `meta.pagination` object in the response (V3 API calls). If the endpoint does not support pagination, this option will have no effect.',
+					},
+				],
+			},
+		],
+	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const credentials = await this.getCredentials('bigcommerceApi');
+		const parameters = Object.keys(this.getNode().parameters);
+
+		console.log('Bigcommerce_Action: execute called.');
+
+		const executeSingle = async (
+			params: Record<string, object | NodeParameterValueType>,
+		): Promise<INodeExecutionData[]> => {
+			const specialOptions = params['specialOptions'] as IDataObject;
+			const backoff429: boolean = specialOptions['backoff429'] as boolean;
+			const autoPaginate: boolean = specialOptions['autoPaginate'] as boolean;
+
+			const generateRequestOptions = (params: Record<string, object | NodeParameterValueType>, queryExtra: Record<string, object | NodeParameterValueType> = {}): IHttpRequestOptions => {
+				return {
+					url: `https://api.bigcommerce.com/stores/${credentials.storeHash}${params['apiEndpointPath']}${(()=>{
+						try {
+							const temp = querystring.stringify({...(JSON.parse(params['queryParameters'] as string) || {}), ...queryExtra});
+							return temp ? `?${temp}` : '';
+						} catch (_){return undefined}})() || ""}`,
+					method: params['requestType'] as IHttpRequestMethods,
+					headers: {
+						Accept: 'application/json',
+						'Content-Type': 'application/json',
+						'X-Auth-Token': credentials.token,
+					},
+					body: params['bodyParameters'] || {},
+					ignoreHttpStatusErrors: true, // We handle errors manually
+				};
+			}
+
+			const fetchWithBackoff = async (fetchFn: () => Promise<any>): Promise<any> => {
+				let response = await fetchFn();
+
+				if (backoff429 && response.status === 429) {
+					const retryAfterHeader = response.headers.get('X-Retry-After');
+					let waitTime = 1000; // Default backoff 1 second
+
+					if (retryAfterHeader) {
+						const parsed = parseInt(retryAfterHeader, 10);
+						if (!isNaN(parsed)) {
+							waitTime = parsed * 1000;
+						} else {
+							const retryDate = new Date(retryAfterHeader).getTime();
+							const now = Date.now();
+							if (retryDate > now) {
+								waitTime = retryDate - now;
+							}
+						}
+					}
+
+					console.log(`Received 429. Backing off for ${waitTime}ms before retrying...`);
+					await delay(waitTime);
+
+					return fetchWithBackoff(fetchFn);
+				}
+
+				return response;
+			};
+
+			const originalFetch = fetchWithBackoff(() => this.helpers.httpRequest(generateRequestOptions(params)));
+			const originalData:any = await originalFetch;
+			if (autoPaginate) {
+				const paginationData:any = originalData?.meta?.pagination || {};
+				const totalPages = paginationData.total_pages || 1;
+				const currentPage = paginationData.current_page || 1;
+				const ret:INodeExecutionData[] = [{json: originalData}];
+				await Promise.all(
+					[...new Array(totalPages - currentPage).keys()]
+						.map((n) => totalPages - n)
+						.reverse()
+						.map((page) =>
+							fetchWithBackoff(() =>
+								this.helpers.httpRequest(generateRequestOptions(params, { page: page })),
+							),
+						),
+				).then((arr) => arr.forEach(async (p) => (ret.push({json: await p}))));
+
+				return ret;
+			}
+			return [{json: originalData}];
+		};
+
+		const safeExecuteSingle = async (itemIndex: number): Promise<INodeExecutionData[]> => {
+			try {
+				const params = parameters.reduce<Record<string, object | NodeParameterValueType>>(
+					(acc, p) => {
+						acc[p] = this.getNodeParameter(p, itemIndex);
+						return acc;
+					},
+					{},
+				);
+				return executeSingle(params);
+			} catch (error) {
+				if (this.continueOnFail()) {
+					return [{
+						json: this.getInputData(itemIndex)[0].json,
+						error,
+						pairedItem: itemIndex,
+					}];
+				} else {
+					if (error.context) {
+						error.context.itemIndex = itemIndex;
+						throw error;
+					}
+					throw new NodeOperationError(this.getNode(), error, {
+						itemIndex,
+					});
+				}
+			}
+		}
+
+		const promises = items.map(async (item, itemIndex): Promise<INodeExecutionData[]> => {
+			return await safeExecuteSingle(itemIndex);
+		});
+
+		return [(await Promise.all(promises)).flat()];
+	}
+}
