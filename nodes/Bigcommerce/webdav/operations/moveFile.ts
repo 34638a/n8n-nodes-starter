@@ -1,0 +1,33 @@
+import { joinURL } from "../tools/url";
+import { encodePath } from "../tools/path";
+import { request, prepareRequestOptions } from "../request";
+import { handleResponseCode } from "../response";
+import { MoveFileOptions, WebDAVClientContext } from "../types";
+
+export async function moveFile(
+    context: WebDAVClientContext,
+    filename: string,
+    destination: string,
+    options: MoveFileOptions = {}
+): Promise<void> {
+    const requestOptions = prepareRequestOptions(
+        {
+            url: joinURL(context.remoteURL, encodePath(filename)),
+            method: "MOVE",
+            headers: {
+                Destination: joinURL(context.remoteURL, encodePath(destination)),
+                /**
+                 * From RFC4918 section 10.6: If the overwrite header is not included in a COPY or MOVE request,
+                 * then the resource MUST treat the request as if it has an overwrite header of value "T".
+                 *
+                 * Meaning the overwrite header is always set to "T" EXCEPT the option is explicitly set to false.
+                 */
+                Overwrite: options.overwrite === false ? "F" : "T"
+            }
+        },
+        context,
+        options
+    );
+    const response = await request(requestOptions, context);
+    handleResponseCode(context, response);
+}
