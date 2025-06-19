@@ -1,60 +1,78 @@
 {
-  "name": "@mainlanddev/n8n-nodes-bigcommerce",
-  "version": "0.1.0",
-  "description": "A node for n8n to interact with the Bigcommerce API.",
-  "keywords": [
-    "n8n-community-node-package"
-  ],
-  "license": "MIT",
-  "homepage": "",
-  "author": {
-    "name": "",
-    "email": ""
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/<...>/n8n-nodes-<...>.git"
-  },
-  "engines": {
-    "node": ">=20.15"
-  },
-  "main": "index.js",
-  "scripts": {
-    "build": "npx rimraf dist && tsc && gulp build:icons",
-    "dev": "tsc --watch",
-    "runN8N": "npx n8n start",
-    "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes credentials package.json",
-    "lintfix": "eslint nodes credentials package.json --fix",
-    "prepublishOnly": "npm build && npm lint -c .eslintrc.prepublish.js nodes credentials package.json"
-  },
-  "files": [
-    "dist"
-  ],
-  "n8n": {
-    "n8nNodesApiVersion": 1,
-    "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
+    "name": "@mainlanddev/n8n-nodes-bigcommerce",
+    "version": "0.1.0",
+    "description": "A node for n8n to interact with the Bigcommerce API.",
+    "keywords": [
+        "n8n-community-node-package"
     ],
-    "nodes": [
-      "dist/nodes/Bigcommerce/Bigcommerce_Action.node.js",
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js"
-    ]
-  },
-  "devDependencies": {
-    "@typescript-eslint/parser": "~8.32.0",
-    "eslint": "^8.57.0",
-    "eslint-plugin-n8n-nodes-base": "^1.16.3",
-    "gulp": "^5.0.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.2"
-  },
-  "peerDependencies": {
-    "n8n-workflow": "*"
-  },
-  "dependencies": {
-    "@types/node": "^22.15.23"
-  }
+    "license": "MIT",
+    "homepage": "",
+    "author": {
+        "name": "",
+        "email": ""
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/<...>/n8n-nodes-<...>.git"
+    },
+    "engines": {
+        "node": ">=20.15"
+    },
+    "main": "index.js",
+    "scripts": {
+        "buildts": "node build.js",
+        "build": "npx rimraf dist && tsc && gulp build:icons",
+        "dev": "tsc --watch",
+        "runN8N": "npx n8n start",
+        "format": "prettier nodes credentials --write",
+        "lint": "eslint nodes credentials package.json",
+        "lintfix": "eslint nodes credentials package.json --fix",
+        "prepublishOnly": "npm build && npm lint -c .eslintrc.prepublish.js nodes credentials package.json"
+    },
+    "files": [
+        "dist"
+    ],
+    "n8n": {
+        "n8nNodesApiVersion": 1,
+        "credentials": [
+            "dist/credentials/ExampleCredentialsApi.credentials.js",
+            "dist/credentials/HttpBinApi.credentials.js"
+        ],
+        "nodes": [
+            "dist/nodes/Bigcommerce/Bigcommerce_Action.node.js",
+            "dist/nodes/ExampleNode/ExampleNode.node.js",
+            "dist/nodes/HttpBin/HttpBin.node.js"
+        ]
+    },
+    "devDependencies": {
+        "@types/base-64": "^1.0.2",
+        "@types/md5": "^2.3.5",
+        "@types/url-parse": "^1.4.11",
+        "@typescript-eslint/parser": "~8.32.0",
+        "esbuild": "^0.25.5",
+        "eslint": "^8.57.0",
+        "eslint-plugin-n8n-nodes-base": "^1.16.3",
+        "gulp": "^5.0.0",
+        "prettier": "^3.5.3",
+        "typescript": "^5.8.2"
+    },
+    "peerDependencies": {
+        "n8n-workflow": "*"
+    },
+    "dependencies": {
+        "@types/node": "^22.15.23",
+        "base-64": "^1.0.0",
+        "byte-length": "^1.0.2",
+        "entities": "^6.0.0",
+        "fast-glob": "^3.3.3",
+        "fast-xml-parser": "^5.2.3",
+        "hot-patcher": "^2.0.1",
+        "md5": "^2.3.0",
+        "nested-property": "^4.0.0",
+        "node-fetch": "^3.3.2",
+        "p-limit": "^6.2.0",
+        "path-posix": "^1.0.0",
+        "url-join": "^5.0.0",
+        "url-parse": "^1.5.10"
+    }
 }

@@ -36,6 +36,53 @@ export class Bigcommerce_Action implements INodeType {
 			// Node properties which the user gets displayed and
 			// can change on the node.
 			{
+				displayName: 'REST or GraphQL',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'REST',
+						value: 'rest',
+					},
+					{
+						name: 'GraphQL',
+						value: 'graphql',
+					},
+				],
+				default: 'rest',
+				required: true,
+			},
+			{
+				displayName: "GraphQL Query String",
+				name: 'graphqlQuery',
+				type: 'string',
+				default: '',
+				description:
+					'The GraphQL query string to execute. This should be a valid GraphQL query. Check the BigCommerce API documentation for available queries.',
+				required: true,
+				validateType: 'string',
+				displayOptions: {
+					show: {
+						operation: ['graphql'],
+					}
+				}
+			},
+			{
+				displayName: 'GraphQL Variables',
+				name: 'graphqlVariables',
+				type: 'json',
+				default: '{}',
+				description:
+					'Optional variables to include in the GraphQL query. This should be a valid JSON object.',
+				hint: 'This should be a valid JSON object. The variables will be passed to the GraphQL query as variables. For example, if your query is `query($id: ID!) { product(id: $id) { name } }`, you can pass the variable as `{"id": 123}`.',
+				displayOptions: {
+					show: {
+						operation: ['graphql'],
+					}
+				}
+			},
+			{
 				displayName: 'API Endpoint Path',
 				name: 'apiEndpointPath',
 				type: 'string',
@@ -45,6 +92,11 @@ export class Bigcommerce_Action implements INodeType {
 					'The API endpoint path to call. This should be the path after the store hash, e.g., `/v3/catalog/products`. Check the BigCommerce API documentation for available endpoints. Leading Slash is required.',
 				required: true,
 				validateType: 'string',
+				displayOptions: {
+					show: {
+						operation: ['rest'],
+					}
+				}
 			},
 			{
 				displayName: 'Request Type',
@@ -72,6 +124,11 @@ export class Bigcommerce_Action implements INodeType {
 				description:
 					'The HTTP request type to use for the API call. Check the BigCommerce API documentation for the correct request type to use for each endpoint.',
 				required: true,
+				displayOptions: {
+					show: {
+						operation: ['rest'],
+					}
+				}
 			},
 			{
 				displayName: 'Query Parameters',
@@ -82,6 +139,11 @@ export class Bigcommerce_Action implements INodeType {
 				description:
 					'Optional query parameters to include in the API request. These will be appended to the URL as query strings.',
 				hint: "If bigcommerce specifies a array/list of items as your input. For example `id:in`, and your data is a JS Array: `[1,2,3]`, you can use the expression `{{ $json.id.join(',') }}` to convert it to a comma-separated string. This is necessary because Bigcommerce does not support array inputs in query parameters.",
+				displayOptions: {
+					show: {
+						operation: ['rest'],
+					}
+				}
 			},
 			{
 				displayName: 'Body JSON',
@@ -92,6 +154,11 @@ export class Bigcommerce_Action implements INodeType {
 				description:
 					'Optional body parameters to include in the API request. This is typically used for POST and PUT requests where you need to send data to the server.',
 				hint: 'This should be a valid JSON object. If you need to send an array, as the body, be sure to wrap the entire input `[{"text": "value1"}, {"text": "value2"}` in square brackets. BigCommerce API expects the body to be an array for certain endpoints.`',
+				displayOptions: {
+					show: {
+						operation: ['rest'],
+					}
+				}
 			},
 			{
 				displayName: 'Special Options',
@@ -125,6 +192,11 @@ export class Bigcommerce_Action implements INodeType {
 						hint: 'This will only work for endpoints that support pagination and return a `meta.pagination` object in the response (V3 API calls). If the endpoint does not support pagination, this option will have no effect.',
 					},
 				],
+				displayOptions: {
+					show: {
+						operation: ['rest'],
+					}
+				}
 			},
 		],
 	};
@@ -134,9 +206,7 @@ export class Bigcommerce_Action implements INodeType {
 		const credentials = await this.getCredentials('bigcommerceApi');
 		const parameters = Object.keys(this.getNode().parameters);
 
-		console.log('Bigcommerce_Action: execute called.');
-
-		const executeSingle = async (
+		const executeSingleREST = async (
 			params: Record<string, object | NodeParameterValueType>,
 		): Promise<INodeExecutionData[]> => {
 			const specialOptions = params['specialOptions'] as IDataObject;
@@ -145,6 +215,7 @@ export class Bigcommerce_Action implements INodeType {
 
 			const generateRequestOptions = (params: Record<string, object | NodeParameterValueType>, queryExtra: Record<string, object | NodeParameterValueType> = {}): IHttpRequestOptions => {
 				return {
+					abortSignal: this.getExecutionCancelSignal(),
 					url: `https://api.bigcommerce.com/stores/${credentials.storeHash}${params['apiEndpointPath']}${(()=>{
 						try {
 							const temp = querystring.stringify({...(JSON.parse(params['queryParameters'] as string) || {}), ...queryExtra});
@@ -213,6 +284,26 @@ export class Bigcommerce_Action implements INodeType {
 			return [{json: originalData}];
 		};
 
+		const executeSingleGraphQL = async (params: Record<string, object | NodeParameterValueType>): Promise<INodeExecutionData[]> => {
+
+			const request = JSON.parse(await this.helpers.request({
+				abortSignal: this.getExecutionCancelSignal(),
+				url: `https://api.bigcommerce.com/accounts/${credentials.graphQLAccountId}/graphql`,
+				method: "POST",
+				headers: {
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
+					'X-Auth-Token': credentials.graphQLToken,
+				},
+				body: {
+					"query": params['graphqlQuery'] as string,
+					"variables": JSON.parse(params['graphqlVariables'] as string) || "{}",
+				}
+			} as IHttpRequestOptions));
+
+			return [{json: request}];
+		}
+
 		const safeExecuteSingle = async (itemIndex: number): Promise<INodeExecutionData[]> => {
 			try {
 				const params = parameters.reduce<Record<string, object | NodeParameterValueType>>(
@@ -222,7 +313,11 @@ export class Bigcommerce_Action implements INodeType {
 					},
 					{},
 				);
-				return executeSingle(params);
+
+				if (params["operation"] === "graphql") {
+					return executeSingleGraphQL(params);
+				}
+				return executeSingleREST(params);
 			} catch (error) {
 				if (this.continueOnFail()) {
 					return [{
