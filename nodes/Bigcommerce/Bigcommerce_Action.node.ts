@@ -191,6 +191,15 @@ export class Bigcommerce_Action implements INodeType {
 						description: 'Automatically handle pagination and retrieve all pages of results. This will make multiple API calls until all pages are retrieved. If disabled, only the first page of results will be returned.',
 						hint: 'This will only work for endpoints that support pagination and return a `meta.pagination` object in the response (V3 API calls). If the endpoint does not support pagination, this option will have no effect.',
 					},
+					{
+						displayName: 'Override Pagination Limit on V2 API Calls',
+						name: 'autoPaginateOverride',
+						type: 'boolean',
+						default: false,
+						// eslint-disable-next-line n8n-nodes-base/node-param-description-boolean-without-whether
+						description: 'There is a hard cap of 1000 calls to a v2 API request implemented to prevent runnaway loops. If you are sure that the endpoint supports more than 1000 pages, you can enable this option to override the limit. This will allow the node to continue fetching pages until all data is retrieved.',
+						hint: 'This will only work for endpoints that return pages of non-indexed pagination data (V2 API calls). If the endpoint does not support pagination, this option will have no effect.',
+					},
 				],
 				displayOptions: {
 					show: {
@@ -212,6 +221,7 @@ export class Bigcommerce_Action implements INodeType {
 			const specialOptions = params['specialOptions'] as IDataObject;
 			const backoff429: boolean = specialOptions['backoff429'] as boolean;
 			const autoPaginate: boolean = specialOptions['autoPaginate'] as boolean;
+			const autoPaginateOverride: boolean = specialOptions['autoPaginateOverride'] as boolean;
 
 			const generateRequestOptions = (params: Record<string, object | NodeParameterValueType>, queryExtra: Record<string, object | NodeParameterValueType> = {}): IHttpRequestOptions => {
 				return {
@@ -263,6 +273,40 @@ export class Bigcommerce_Action implements INodeType {
 
 			const originalFetch = fetchWithBackoff(() => this.helpers.httpRequest(generateRequestOptions(params)));
 			const originalData:any = await originalFetch;
+			if (!originalData) {
+				console.warn('Bigcommerce API returned no data.');
+				return [];
+			}
+			if (Array.isArray(originalData)) {
+				// This endpoint does not support pagination, handle accordingly
+				console.log('Received an array response, treating as a v2 API call.');
+				if (autoPaginate) {
+					console.warn('Auto-pagination is enabled, but the endpoint returned an array. This may not work as expected.');
+					let page = params['page'] as number || 1;
+					let gatheredData: any[] = [...originalData];
+					let lastPageData:any[] = [...originalData];
+					while (true) {
+						if (page===100) {
+							console.error("Large data set detected, Be sure to check that this is intended, as this may cause performance issues.");
+						}
+						if (page === 1000 && !autoPaginateOverride) {
+							throw new NodeOperationError(this.getNode(), 'Bigcommerce API returned more than 1000 pages of data. This is likely an error in the API or the request parameters. Please check your request parameters and try again.', params);
+						}
+						lastPageData = await fetchWithBackoff(() =>
+							this.helpers.httpRequest(generateRequestOptions(params, { page: page++ })),
+						);
+						if (Array.isArray(lastPageData)) {
+							gatheredData = gatheredData.concat(lastPageData);
+							continue;
+						}
+						break;
+					}
+
+					return gatheredData.filter(d=>!!d).map((data) => ({json: data}));
+				}
+				return originalData.filter(d=>!!d).map((data) => ({json: data}));
+			}
+
 			if (autoPaginate) {
 				const paginationData:any = originalData?.meta?.pagination || {};
 				const totalPages = paginationData.total_pages || 1;
@@ -281,6 +325,7 @@ export class Bigcommerce_Action implements INodeType {
 
 				return ret;
 			}
+
 			return [{json: originalData}];
 		};
 

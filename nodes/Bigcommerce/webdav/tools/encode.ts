@@ -1,4 +1,4 @@
-import base64 from "base-64";
+import base64 from "base64-js";
 import { decodeHTML } from "entities";
 
 export function decodeHTMLEntities(text: string): string {
@@ -6,9 +6,10 @@ export function decodeHTMLEntities(text: string): string {
 }
 
 export function fromBase64(text: string): string {
-    return base64.decode(text);
+	const buffer = base64.toByteArray(text);
+    return base64.fromByteArray(buffer);//.decode(text);
 }
 
 export function toBase64(text: string): string {
-    return base64.encode(text);
+    return Buffer.from(base64.toByteArray(text)).toString('base64')//.encode(text);
 }

@@ -1,5 +1,6 @@
 const path = require('path');
 const { task, src, dest } = require('gulp');
+const install = require('gulp-install');
 
 task('build:icons', copyIcons);
 

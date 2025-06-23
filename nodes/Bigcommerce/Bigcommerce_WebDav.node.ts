@@ -8,8 +8,8 @@ import type {
 	NodeParameterValueType,
 } from 'n8n-workflow';
 import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
-import { AuthType, createClient, FileStat } from './webdav';
-import pLimit from "p-limit";
+import {esmImport} from "../util/esmImport";
+import {AuthType, createClient, FileStat} from "./webdav";
 
 export class Bigcommerce_WebDav implements INodeType {
 	description: INodeTypeDescription = {
@@ -149,7 +149,6 @@ export class Bigcommerce_WebDav implements INodeType {
 		const credentials = await this.getCredentials('bigcommerceWebDavCredentialsApi');
 		const parameters = Object.keys(this.getNode().parameters);
 
-
 		const client = createClient(credentials.storeUrl as string, {
 			authType: AuthType.Digest,
 			username: credentials.username as string,
@@ -246,7 +245,10 @@ export class Bigcommerce_WebDav implements INodeType {
 
 							// If the path is a folder, we read it and return the files within as binary data
 							const contents = await getDirectoryContents(path);
-							const limit = pLimit(4);
+
+
+							const pLimit = await esmImport("p-limit");
+							const limit = pLimit.default(4);
 
 							return (
 								await Promise.all(
