@@ -1,11 +1,13 @@
 import { ICredentialType, INodeProperties } from 'n8n-workflow';
+import {IconFile} from "n8n-workflow/dist/Interfaces";
 
 //eslint-disable
 export class BigcommerceWebDavApi implements ICredentialType {
 	//eslint-disable
-	name = 'bigcommerceWebDavCredentialsApi';
-	displayName = 'Bigcommerce WebDav API';
+	name = 'bigcommerceWebDavApi';
+	displayName = 'Bigcommerce - WebDav API';
 	documentationUrl = 'https://developer.bigcommerce.com/';
+	icon = "file:bigcommerce-logomark-whitebg.svg" as IconFile;
 	properties: INodeProperties[] = [
 		// The credentials to get from user and save encrypted.
 		// Properties can be defined exactly in the same way

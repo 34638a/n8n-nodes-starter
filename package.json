@@ -35,10 +35,13 @@
     "n8n": {
         "n8nNodesApiVersion": 1,
         "credentials": [
-            "dist/credentials/BigcommerceApi.credentials.js"
+            "dist/credentials/BigcommerceRESTApi.credentials.js",
+            "dist/credentials/BigcommerceGraphQLApi.credentials.js",
+            "dist/credentials/BigcommerceWebDavApi.credentials.js"
         ],
         "nodes": [
-            "dist/nodes/Bigcommerce/Bigcommerce_Action.node.js"
+            "dist/nodes/Bigcommerce/Bigcommerce_Action.node.js",
+            "dist/nodes/Bigcommerce/Bigcommerce_Trigger.node.js"
         ]
     },
     "devDependencies": {

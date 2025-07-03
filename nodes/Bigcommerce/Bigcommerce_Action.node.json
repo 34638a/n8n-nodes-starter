@@ -1,0 +1,25 @@
+{
+	"node": "n8n-nodes-base.bigcommerceActionNode",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": [],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://developer.bigcommerce.com/"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://developer.bigcommerce.com/"
+			}
+		],
+		"generic": [
+			{
+				"label": "Hey founders! Your business doesn't need you to operate",
+				"icon": " 🖥️",
+				"url": "https://n8n.io/blog/your-business-doesnt-need-you-to-operate/"
+			}
+		]
+	}
+}

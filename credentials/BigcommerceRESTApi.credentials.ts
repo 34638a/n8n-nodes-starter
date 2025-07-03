@@ -1,10 +1,10 @@
 import { ICredentialType, INodeProperties } from 'n8n-workflow';
 import {IconFile} from "n8n-workflow/dist/Interfaces";
 
-export class BigcommerceApi implements ICredentialType {
+export class BigcommerceRESTApi implements ICredentialType {
 
 	name = 'bigcommerceApi';
-	displayName = 'Bigcommerce API';
+	displayName = 'Bigcommerce - REST API';
 	documentationUrl = 'https://developer.bigcommerce.com/';
 	icon = "file:bigcommerce-logomark-whitebg.svg" as IconFile;
 	properties: INodeProperties[] = [
@@ -29,25 +29,6 @@ export class BigcommerceApi implements ICredentialType {
 			hint: 'The access token from your API credentials. It <b><u>SHOULD BE A</u></b> 31-character string that authorizes access to your BigCommerce store via the API. You can generate this token in your BigCommerce control panel under "Advanced Settings" > "API Accounts". Do not confuse it with the Client ID or Client Secret, which are used for client imitation OAuth authentication.',
 			placeholder: 'your-access-token-as-31char-str',
 			required: false,
-		},
-		{
-			displayName: '[GraphQL] Account UUID',
-			name: 'graphQLAccountId',
-			type: 'string',
-			default: '',
-			hint: '',
-			placeholder: 'ABCDEF01-2345-6789-ABCD-EF0123456789',
-			required: false,
-		},
-		{
-			displayName: '[GraphQL] Access Token',
-			name: 'graphQLToken',
-			// eslint-disable-next-line
-			type: 'string',
-			default: '',
-			hint: '',
-			placeholder: 'your-access-token-as-31char-str',
-			required: false,
-		},
+		}
 	];
 }
